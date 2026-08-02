@@ -119,6 +119,8 @@ public class SingBoxOptions {
 
         public NTPOptions ntp;
 
+        public List<HTTPClient> http_clients;
+
         public List<Inbound> inbounds;
 
         public List<SingBoxOption> outbounds;
@@ -148,6 +150,14 @@ public class SingBoxOptions {
         public String default_mode;
 
         // Generate note: option type:  public List<String> ModeList;
+
+    }
+
+    public static class HTTPClient extends SingBoxOption {
+
+        public String tag;
+
+        public String detour;
 
     }
 
@@ -324,8 +334,6 @@ public class SingBoxOptions {
 
         public Boolean reverse_mapping;
 
-        public DNSFakeIPOptions fakeip;
-
         // Generate note: nested type DNSClientOptions
         public String strategy;
 
@@ -374,16 +382,6 @@ public class SingBoxOptions {
         public Boolean disable_expire;
 
         public Boolean independent_cache;
-
-    }
-
-    public static class DNSFakeIPOptions extends SingBoxOption {
-
-        public Boolean enabled;
-
-        public String inet4_range;
-
-        public String inet6_range;
 
     }
 
@@ -1085,6 +1083,8 @@ public class SingBoxOptions {
 
         public String default_domain_resolver;
 
+        public String default_http_client;
+
     }
 
 
@@ -1109,6 +1109,10 @@ public class SingBoxOptions {
         public String path;
 
         public String url;
+
+        public String http_client;
+
+        public String update_interval;
 
     }
 
@@ -4601,6 +4605,8 @@ public class SingBoxOptions {
 
         // route "resolve" action strategy (sing-box 1.11+ inbound migration)
         public String strategy;
+
+        public Boolean match_only;
 
     }
 

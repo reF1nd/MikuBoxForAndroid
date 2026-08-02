@@ -321,7 +321,7 @@
     <string name="direct_dns">DNS Langsung (Direct)</string>
     <string name="enable_dns_routing">Aktifin Perutean DNS</string>
     <string name="dns_routing_message">Pake DNS langsung buat resolusi domain yang dilewatin di rute. Hati-hati potensi kebocoran DNS</string>
-    <string name="enable_fakedns">Aktifin FakeDNS</string>
+    <string name="enable_fakedns">Aktifin FakeIP</string>
     <string name="fakedns_message">Bisa nyebabin aplikasi lain perlu dimulai ulang buat nyambung lagi ke jaringan abis proksi berhenti</string>
     <string name="dns_hosts">Timpa Host DNS</string>
     <string name="apps">Aplikasi</string>
@@ -370,7 +370,7 @@
     <string name="wireguard_local_address">Alamat lokal</string>
     <string name="wireguard_public_key">Public key peer</string>
     <string name="wireguard_psk">Pre-shared key peer</string>
-    <string name="resolve_destination_summary">Kalo tujuannya domain, resolusiin pake kebijakan IPv6 (bertentangan sama FakeDNS)</string>
+    <string name="resolve_destination_summary">Kalo tujuannya domain, resolusiin pake kebijakan IPv6</string>
     <string name="resolve_destination">Resolusiin Tujuan</string>
     <string name="destination_override_summary">Pake domain yang diintip buat nimpa tujuan, bukan cuma buat routing</string>
     <string name="destination_override">Timpa Tujuan</string>

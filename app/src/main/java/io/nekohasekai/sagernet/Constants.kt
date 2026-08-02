@@ -49,6 +49,11 @@ object Key {
     const val NETWORK_CHANGE_RESET_CONNECTIONS = "networkChangeResetConnections"
     const val WAKE_RESET_CONNECTIONS = "wakeResetConnections"
     const val RULES_PROVIDER = "rulesProvider"
+    const val RULES_RESOURCE_MODE = "rulesResourceMode"
+    const val RULES_GEOSITE_REMOTE_URL = "rulesGeositeRemoteUrl"
+    const val RULES_GEOIP_REMOTE_URL = "rulesGeoipRemoteUrl"
+    const val RULES_REMOTE_DOWNLOAD_MODE = "rulesRemoteDownloadMode"
+    const val RULES_REMOTE_DOWNLOAD_PROXY = RULES_REMOTE_DOWNLOAD_MODE + "Long"
     const val LOG_LEVEL = "logLevel"
     const val LOG_BUF_SIZE = "logBufSize"
     const val MTU = "mtu"
@@ -186,6 +191,12 @@ object IPv6Mode {
     const val ENABLE = 1
     const val PREFER = 2
     const val ONLY = 3
+}
+
+object RuleSetDownloadMode {
+    const val DIRECT = "direct"
+    const val CURRENT = "current"
+    const val SPECIFIC = "specific"
 }
 
 object GroupType {

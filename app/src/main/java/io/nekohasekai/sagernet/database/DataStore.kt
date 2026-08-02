@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.CONNECTION_TEST_URL
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.IPv6Mode
 import io.nekohasekai.sagernet.Key
+import io.nekohasekai.sagernet.RuleSetDownloadMode
 import io.nekohasekai.sagernet.TunImplementation
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.VpnService
@@ -139,7 +140,15 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
-    var resolveDestination by configurationStore.boolean(Key.RESOLVE_DESTINATION)
+    var resolveDestination: Int
+        get() {
+            migrateResolveDestination()
+            return configurationStore.getString(Key.RESOLVE_DESTINATION)!!.toInt().coerceIn(0, 2)
+        }
+        set(value) = configurationStore.putString(
+            Key.RESOLVE_DESTINATION,
+            value.coerceIn(0, 2).toString(),
+        )
 
     var mtu by configurationStore.stringToInt(Key.MTU) { 9000 }
 
@@ -158,14 +167,25 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
 
     var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)
+    var rulesResourceMode by configurationStore.stringToInt(Key.RULES_RESOURCE_MODE)
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
     var logBufSize by configurationStore.int(Key.LOG_BUF_SIZE) { 0 }
     var acquireWakeLock by configurationStore.boolean(Key.ACQUIRE_WAKE_LOCK)
     var fabStyle by configurationStore.stringToInt("fab_style") { 1 }
     var hideFromRecentApps by configurationStore.boolean("hide_from_recent_apps")
     
-    var rulesGeositeUrl by configurationStore.string("rules_geosite_url") { "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" }
-    var rulesGeoipUrl by configurationStore.string("rules_geoip_url") { "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db" }
+    var rulesGeositeUrl by configurationStore.string("rules_geosite_url") { "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db" }
+    var rulesGeoipUrl by configurationStore.string("rules_geoip_url") { "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" }
+    var rulesGeositeRemoteUrl by configurationStore.string(Key.RULES_GEOSITE_REMOTE_URL) {
+        "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{code}.srs"
+    }
+    var rulesGeoipRemoteUrl by configurationStore.string(Key.RULES_GEOIP_REMOTE_URL) {
+        "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{code}.srs"
+    }
+    var rulesRemoteDownloadMode by configurationStore.string(Key.RULES_REMOTE_DOWNLOAD_MODE) {
+        RuleSetDownloadMode.DIRECT
+    }
+    var rulesRemoteDownloadProxy by configurationStore.long(Key.RULES_REMOTE_DOWNLOAD_PROXY)
 
     // hopefully hashCode = mHandle doesn't change, currently this is true from KitKat to Nougat
     private val userIndex by lazy { Binder.getCallingUserHandle().hashCode() }
@@ -177,6 +197,27 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (configurationStore.getString(Key.MIXED_PORT) == null) {
             mixedPort = mixedPort
         }
+        migrateResolveDestination()
+        if (
+            rulesGeositeUrl == "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" &&
+            rulesGeoipUrl == "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db"
+        ) {
+            rulesGeositeUrl = "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db"
+            rulesGeoipUrl = "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db"
+        }
+    }
+
+    private fun migrateResolveDestination() {
+        val storedValue = configurationStore.getString(Key.RESOLVE_DESTINATION)
+        val normalizedValue = storedValue?.toIntOrNull()?.coerceIn(0, 2)
+        if (normalizedValue != null) {
+            if (storedValue != normalizedValue.toString()) {
+                configurationStore.putString(Key.RESOLVE_DESTINATION, normalizedValue.toString())
+            }
+            return
+        }
+        val migratedValue = if (configurationStore.getBoolean(Key.RESOLVE_DESTINATION) == true) 2 else 0
+        configurationStore.putString(Key.RESOLVE_DESTINATION, migratedValue.toString())
     }
 
 

@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.ui
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -7,6 +8,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.core.app.ActivityCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
@@ -16,8 +18,10 @@ import androidx.preference.SwitchPreference
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.RuleSetDownloadMode
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.FixedLinearLayoutManager
 import io.nekohasekai.sagernet.ktx.needReload
@@ -33,11 +37,25 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import io.nekohasekai.sagernet.utils.showBlur
+import io.nekohasekai.sagernet.widget.OutboundPreference
 
 class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
     private lateinit var isProxyApps: SwitchPreference
     private lateinit var globalCustomConfig: EditConfigPreference
+    private lateinit var rulesRemoteDownloadMode: OutboundPreference
+
+    private val selectRuleSetDownloadProfile = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK || !::rulesRemoteDownloadMode.isInitialized) return@registerForActivityResult
+        val profileId = result.data?.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0L) ?: 0L
+        if (profileId <= 0L) return@registerForActivityResult
+        DataStore.rulesRemoteDownloadProxy = profileId
+        rulesRemoteDownloadMode.value = RuleSetDownloadMode.SPECIFIC
+        rulesRemoteDownloadMode.postUpdate()
+        needReload()
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -84,16 +102,57 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             true
         }
         val rulesProvider = findPreference<SimpleMenuPreference>(Key.RULES_PROVIDER)!!
+        val rulesResourceMode = findPreference<SimpleMenuPreference>(Key.RULES_RESOURCE_MODE)!!
         val rulesGeositeUrl = findPreference<EditTextPreference>("rules_geosite_url")!!
         val rulesGeoipUrl = findPreference<EditTextPreference>("rules_geoip_url")!!
-        rulesGeositeUrl.isVisible = DataStore.rulesProvider == 5
-        rulesGeoipUrl.isVisible = DataStore.rulesProvider == 5
-        rulesProvider.setOnPreferenceChangeListener { _, newValue ->
-            val provider = (newValue as String).toInt()
-            rulesGeositeUrl.isVisible = provider == 5
-            rulesGeoipUrl.isVisible = provider == 5
+        val rulesGeositeRemoteUrl = findPreference<EditTextPreference>(Key.RULES_GEOSITE_REMOTE_URL)!!
+        val rulesGeoipRemoteUrl = findPreference<EditTextPreference>(Key.RULES_GEOIP_REMOTE_URL)!!
+        rulesRemoteDownloadMode = findPreference(Key.RULES_REMOTE_DOWNLOAD_MODE)!!
+        rulesRemoteDownloadMode.setEntries(R.array.rules_remote_download_modes)
+        rulesRemoteDownloadMode.setEntryValues(R.array.rules_remote_download_mode_values)
+        rulesRemoteDownloadMode.summaryProvider = Preference.SummaryProvider<OutboundPreference> {
+            if (it.value == RuleSetDownloadMode.SPECIFIC) {
+                ProfileManager.getProfile(DataStore.rulesRemoteDownloadProxy)?.displayName()
+                    ?: getString(R.string.unavailable)
+            } else {
+                it.entry
+            }
+        }
+        rulesRemoteDownloadMode.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue == RuleSetDownloadMode.SPECIFIC) {
+                val intent = Intent(requireContext(), ProfileSelectActivity::class.java)
+                ProfileManager.getProfile(DataStore.rulesRemoteDownloadProxy)?.let {
+                    intent.putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                }
+                selectRuleSetDownloadProfile.launch(intent)
+                false
+            } else {
+                needReload()
+                true
+            }
+        }
+        fun updateRuleSetPreferences(mode: Int = DataStore.rulesResourceMode, provider: Int = DataStore.rulesProvider) {
+            val legacyMode = mode == 0
+            rulesProvider.isVisible = legacyMode
+            rulesGeositeUrl.isVisible = legacyMode && provider == 5
+            rulesGeoipUrl.isVisible = legacyMode && provider == 5
+            rulesGeositeRemoteUrl.isVisible = !legacyMode
+            rulesGeoipRemoteUrl.isVisible = !legacyMode
+            rulesRemoteDownloadMode.isVisible = !legacyMode
+        }
+        updateRuleSetPreferences()
+        rulesResourceMode.setOnPreferenceChangeListener { _, newValue ->
+            updateRuleSetPreferences(mode = (newValue as String).toInt())
+            needReload()
             true
         }
+        rulesProvider.setOnPreferenceChangeListener { _, newValue ->
+            val provider = (newValue as String).toInt()
+            updateRuleSetPreferences(provider = provider)
+            true
+        }
+        rulesGeositeRemoteUrl.onPreferenceChangeListener = reloadListener
+        rulesGeoipRemoteUrl.onPreferenceChangeListener = reloadListener
         val serviceMode = findPreference<Preference>(Key.SERVICE_MODE)!!
         serviceMode.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, _ ->
             if (DataStore.serviceState.started) SagerNet.stopService()
@@ -152,7 +211,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         findPreference<SwitchPreference>(Key.ENABLE_DNS_ROUTING)!!.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.IPV6_MODE)!!.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.ALLOW_ACCESS)!!.onPreferenceChangeListener = reloadListener
-        findPreference<SwitchPreference>(Key.RESOLVE_DESTINATION)!!.onPreferenceChangeListener = reloadListener
+        findPreference<Preference>(Key.RESOLVE_DESTINATION)!!.onPreferenceChangeListener = reloadListener
         findPreference<SimpleMenuPreference>(Key.TUN_IMPLEMENTATION)!!.onPreferenceChangeListener = reloadListener
         findPreference<SwitchPreference>(Key.ACQUIRE_WAKE_LOCK)!!.onPreferenceChangeListener = reloadListener
         globalCustomConfig.onPreferenceChangeListener = reloadListener
@@ -165,6 +224,9 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         }
         if (::globalCustomConfig.isInitialized) {
             globalCustomConfig.notifyChanged()
+        }
+        if (::rulesRemoteDownloadMode.isInitialized) {
+            rulesRemoteDownloadMode.postUpdate()
         }
     }
     

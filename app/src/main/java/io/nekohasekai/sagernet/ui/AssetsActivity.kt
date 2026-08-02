@@ -15,13 +15,13 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.LayoutAssetItemBinding
 import io.nekohasekai.sagernet.databinding.LayoutAssetsBinding
+import io.nekohasekai.sagernet.fmt.RuleSetAssets
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
 import java.io.File
-import java.io.FileWriter
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import com.google.android.material.appbar.CollapsingToolbarLayout
@@ -34,6 +34,7 @@ class AssetsActivity : ThemedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DataStore.initGlobal()
 
         layout = LayoutAssetsBinding.inflate(layoutInflater)
         setContentView(layout.root)
@@ -113,21 +114,33 @@ class AssetsActivity : ThemedActivity() {
             val filesDir = getExternalFilesDir(null) ?: filesDir
 
             runOnDefaultDispatcher {
-                val outFile = File(filesDir, fileName).apply {
-                    parentFile?.mkdirs()
+                runCatching {
+                    val outFile = File(filesDir, fileName).apply {
+                        parentFile?.mkdirs()
+                    }
+                    val temporaryFile = File(outFile.parentFile, ".${outFile.name}.import.tmp")
+                    try {
+                        contentResolver.openInputStream(file)?.use { input ->
+                            temporaryFile.outputStream().use(input::copyTo)
+                        } ?: error(getString(R.string.route_asset_open_failed, fileName))
+                        RuleSetAssets.convertDatabase(fileName, temporaryFile)
+                        if (!temporaryFile.renameTo(outFile)) {
+                            error(getString(R.string.route_asset_replace_failed, fileName))
+                        }
+                    } finally {
+                        temporaryFile.delete()
+                    }
+
+                    File(outFile.parentFile, outFile.nameWithoutExtension + ".version.txt").apply {
+                        writeText("Custom")
+                    }
+
+                    adapter.reloadAssets()
+                }.onFailure {
+                    onMainDispatcher {
+                        alert(it.readableMessage).tryToShow()
+                    }
                 }
-
-                contentResolver.openInputStream(file)?.use(outFile.outputStream())
-
-                File(outFile.parentFile, outFile.nameWithoutExtension + ".version.txt").apply {
-                    if (isFile) delete()
-                    createNewFile()
-                    val fw = FileWriter(this)
-                    fw.write("Custom")
-                    fw.close()
-                }
-
-                adapter.reloadAssets()
             }
 
         }
@@ -226,7 +239,12 @@ class AssetsActivity : ThemedActivity() {
                 "<unknown>"
             }
 
-            binding.assetStatus.text = getString(R.string.route_asset_status, localVersion)
+            val status = getString(R.string.route_asset_status, localVersion)
+            binding.assetStatus.text = if (file.name in assetNames) {
+                "$status\n${getString(R.string.rules_generated_count, RuleSetAssets.generatedCount(file.name))}"
+            } else {
+                status
+            }
 
             binding.rulesUpdate.isInvisible = file.name !in assetNames
             binding.rulesUpdate.setOnClickListener {
@@ -299,6 +317,7 @@ class AssetsActivity : ThemedActivity() {
             val tagName = release.optString("tag_name")
 
             if (tagName == localVersion) {
+                RuleSetAssets.convertDatabase(fileName, file)
                 onMainDispatcher {
                     snackbar(R.string.route_asset_no_update).show()
                 }
@@ -317,13 +336,14 @@ class AssetsActivity : ThemedActivity() {
             val cacheFile = File(file.parentFile, fileName + ".tmp")
             cacheFile.parentFile?.mkdirs()
 
-            response.writeTo(cacheFile.canonicalPath)
-
-            if (fileName.endsWith(".xz")) {
-                Libcore.unxz(cacheFile.absolutePath, file.absolutePath)
+            try {
+                response.writeTo(cacheFile.canonicalPath)
+                RuleSetAssets.convertDatabase(fileName, cacheFile)
+                if (!cacheFile.renameTo(file)) {
+                    error(getString(R.string.route_asset_replace_failed, fileName))
+                }
+            } finally {
                 cacheFile.delete()
-            } else {
-                cacheFile.renameTo(file)
             }
 
             versionFile.writeText(tagName)
@@ -358,8 +378,15 @@ class AssetsActivity : ThemedActivity() {
             }.execute()
             val cacheFile = File(file.parentFile, fileName + ".tmp")
             cacheFile.parentFile?.mkdirs()
-            response.writeTo(cacheFile.canonicalPath)
-            cacheFile.renameTo(file)
+            try {
+                response.writeTo(cacheFile.canonicalPath)
+                RuleSetAssets.convertDatabase(fileName, cacheFile)
+                if (!cacheFile.renameTo(file)) {
+                    error(getString(R.string.route_asset_replace_failed, fileName))
+                }
+            } finally {
+                cacheFile.delete()
+            }
 
             val currentDate = java.text.SimpleDateFormat("yyyyMMdd").format(java.util.Date())
             versionFile.writeText(currentDate)

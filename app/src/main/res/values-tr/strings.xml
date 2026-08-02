@@ -81,7 +81,7 @@
     <string name="direct_dns">Doğrudan DNS</string>
     <string name="enable_dns_routing">DNS Yönlendirmesini Etkinleştir</string>
     <string name="dns_routing_message">Bypass rotalarındaki alan adlarını Doğrudan DNS ile çöz. Potansiyel DNS sızıntılarına dikkat edin</string>
-    <string name="enable_fakedns">FakeDNS\'i Etkinleştir</string>
+    <string name="enable_fakedns">FakeIP\'yi Etkinleştir</string>
     <string name="fakedns_message">Proxy durdurulduktan sonra ağa yeniden bağlanmak için diğer uygulamaların yeniden başlatılmasını gerektirebilir</string>
     <string name="dns_hosts">Alan adı yeniden yazma</string>
     <string name="port_local_dns">Yerel DNS Portu</string>
@@ -403,7 +403,7 @@
     <string name="destination_override">Hedefi Geçersiz Kıl</string>
     <string name="destination_override_summary">Sadece yönlendirme için değil, hedef adresi üzerine yazmak için koklanan (sniffed) alan adını kullan</string>
     <string name="resolve_destination">Hedefi Çözümle</string>
-    <string name="resolve_destination_summary">Hedef adres bir alan adıysa, FakeDNS ile çakışarak IPv6 stratejisine göre dışarı aktarılır</string>
+    <string name="resolve_destination_summary">Hedef adres bir alan adıysa IPv6 stratejisine göre çözümlenir</string>
     <string name="pcap" translatable="false">Pcap</string>
     <string name="pcap_notice">Pcap dosyaları %s konumuna kaydedilecek</string>
     <string name="naive_insecure_concurrency">Güvensiz Eşzamanlılık</string>

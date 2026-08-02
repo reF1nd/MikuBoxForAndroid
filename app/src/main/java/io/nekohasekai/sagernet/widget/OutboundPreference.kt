@@ -36,4 +36,8 @@ class OutboundPreference : SimpleMenuPreference {
         return super.getSummary()
     }
 
+    fun postUpdate() {
+        notifyChanged()
+    }
+
 }

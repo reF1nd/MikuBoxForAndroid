@@ -86,7 +86,7 @@
     <string name="enable_dns_routing">Enable DNS Routing</string>
     <string name="dns_routing_message">Resolve domains in bypass routes with Direct DNS. Be aware of
         potential DNS leaks</string>
-    <string name="enable_fakedns">Enable FakeDNS</string>
+    <string name="enable_fakedns">Enable FakeIP</string>
     <string name="fakedns_message">May cause other applications need to be restarted to reconnect to
         the network after proxy stopped</string>
     <string name="dns_hosts">Domain rewrite</string>
@@ -150,6 +150,23 @@
     <string name="route_manage_assets">Manage Route Assets</string>
     <string name="route_assets">Assets</string>
     <string name="route_rules_provider">Rule Assets Provider</string>
+    <string name="rules_resource_mode">Rule-set Mode</string>
+    <string name="rules_legacy_db_mode">Legacy DB compatibility</string>
+    <string name="rules_remote_mode">Remote rule-set</string>
+    <string name="rules_geosite_remote_url">Geosite remote URL template</string>
+    <string name="rules_geoip_remote_url">GeoIP remote URL template</string>
+    <string name="rules_remote_download_mode">Remote rule-set download</string>
+    <string name="rules_remote_download_direct">Direct</string>
+    <string name="rules_remote_download_current">Current selected profile</string>
+    <string name="rules_remote_download_specific">Specific profile</string>
+    <string name="rules_remote_download_profile_unavailable">The selected remote rule-set download profile is unavailable</string>
+    <string name="rules_remote_download_mode_invalid">Invalid remote rule-set download mode: %s</string>
+    <string name="rules_remote_url_invalid">Invalid remote rule-set URL for %s</string>
+    <string name="rules_reference_invalid">Invalid rule-set reference: %s</string>
+    <string name="rules_local_asset_missing">Update the %s route asset before starting the service</string>
+    <string name="rules_generated_count">Generated rule-sets: %d</string>
+    <string name="route_asset_open_failed">Unable to open %s</string>
+    <string name="route_asset_replace_failed">Unable to replace %s</string>
     <string name="route_rules_official">Official</string>
     <string name="route_asset_status">Local version: %s</string>
     <string name="route_asset_no_update">No update</string>
@@ -453,9 +470,12 @@
     <string name="destination_override">Override Destination</string>
     <string name="destination_override_summary">Use the sniffed domain to overwrite the destination
         address, not just for routing</string>
+    <string name="traffic_sniffing_match_only">Use sniff result for routing</string>
+    <string name="traffic_sniffing_override_destination">Use sniff result as destination</string>
     <string name="resolve_destination">Resolve Destination</string>
-    <string name="resolve_destination_summary">If the destination address is a domain, it is then
-        passed out based on the IPv6 strategy (conflicts with FakeDNS)</string>
+    <string name="resolve_destination_summary">Resolve domain destinations according to the IPv6 strategy</string>
+    <string name="resolve_destination_match_only">Use resolved address for routing</string>
+    <string name="resolve_destination_override">Use resolved address as destination</string>
     <string name="pcap" translatable="false">Pcap</string>
     <string name="pcap_notice">Pcap files will be saved to %s</string>
     <string name="naive_insecure_concurrency">Insecure Concurrency</string>

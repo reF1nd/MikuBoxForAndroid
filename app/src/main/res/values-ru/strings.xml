@@ -143,7 +143,7 @@
 <string name="enable_dns_routing">Включить маршрутизацию DNS</string>
 <string name="enable_ech">Включить ECH</string>
 <string name="enable_ech_sum">Включить зашифрованный клиент Hello</string>
-<string name="enable_fakedns">Включить FakeDNS</string>
+<string name="enable_fakedns">Включить FakeIP</string>
 <string name="enable_log">Включить журнал</string>
 <string name="enable_log_sum">В целях отладки</string>
 <string name="enable_mux">Включить мультиплексор</string>

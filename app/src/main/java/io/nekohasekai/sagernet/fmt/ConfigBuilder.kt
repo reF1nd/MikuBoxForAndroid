@@ -48,6 +48,9 @@ const val TAG_DIRECT = "direct"
 const val TAG_BYPASS = "bypass"
 const val TAG_BLOCK = "block"
 
+private const val HTTP_CLIENT_DEFAULT = "default-http"
+private const val HTTP_CLIENT_RULE_SET = "rule-set-download"
+
 const val LOCALHOST = "127.0.0.1"
 
 class ConfigBuildResult(
@@ -126,10 +129,42 @@ fun buildConfig(
     }
 
     val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules()
-    val extraProxies =
-        if (forTest) mapOf() else SagerDatabase.proxyDao.getEntities(extraRules.mapNotNull { rule ->
-            rule.outbound.takeIf { it > 0 && it != proxy.id }
-        }.toHashSet().toList()).associateBy { it.id }
+    val useRemoteRuleSets = DataStore.rulesResourceMode == 1 && !forTest
+    val ruleSetDownloadMode = if (useRemoteRuleSets) {
+        DataStore.rulesRemoteDownloadMode
+    } else {
+        RuleSetDownloadMode.DIRECT
+    }
+    val ruleSetDownloadProxyId = if (ruleSetDownloadMode == RuleSetDownloadMode.SPECIFIC) {
+        DataStore.rulesRemoteDownloadProxy
+    } else {
+        0L
+    }
+    if (ruleSetDownloadMode == RuleSetDownloadMode.SPECIFIC && ruleSetDownloadProxyId <= 0L) {
+        throw IllegalArgumentException(
+            SagerNet.application.getString(R.string.rules_remote_download_profile_unavailable),
+        )
+    }
+    val extraProxyIds = extraRules.mapNotNullTo(hashSetOf<Long>()) { rule ->
+        rule.outbound.takeIf { it > 0 && it != proxy.id }
+    }
+    if (ruleSetDownloadProxyId > 0L && ruleSetDownloadProxyId != proxy.id) {
+        extraProxyIds += ruleSetDownloadProxyId
+    }
+    val extraProxies: Map<Long, ProxyEntity> = if (forTest) {
+        mapOf()
+    } else {
+        SagerDatabase.proxyDao.getEntities(extraProxyIds.toList()).associateBy { it.id }
+    }
+    if (
+        ruleSetDownloadProxyId > 0L &&
+        ruleSetDownloadProxyId != proxy.id &&
+        ruleSetDownloadProxyId !in extraProxies
+    ) {
+        throw IllegalArgumentException(
+            SagerNet.application.getString(R.string.rules_remote_download_profile_unavailable),
+        )
+    }
     val buildSelector = !forTest && group?.isSelector == true && !forExport
     val buildLoadBalance = !forTest && group?.isLoadBalance == true && group.isSelector != true && !forExport
     val buildOutboundGroup = buildSelector || buildLoadBalance
@@ -143,8 +178,9 @@ fun buildConfig(
     val directDNS = DataStore.directDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
     val enableDnsRouting = DataStore.enableDnsRouting
-    val useFakeDns = DataStore.enableFakeDns && !forTest
-    val needSniff = DataStore.trafficSniffing > 0
+    val useFakeDns = isVPN && DataStore.enableFakeDns && !forTest
+    val trafficSniffingMode = DataStore.trafficSniffing
+    val resolveDestinationMode = DataStore.resolveDestination
     val externalIndexMap = ArrayList<IndexEntity>()
     val ipv6Mode = if (forTest) IPv6Mode.ENABLE else DataStore.ipv6Mode
 
@@ -159,10 +195,21 @@ fun buildConfig(
     }
 
     return MyOptions().apply {
-        if (!forTest && DataStore.enableClashAPI) experimental = ExperimentalOptions().apply {
-            clash_api = ClashAPIOptions().apply {
-                external_controller = "127.0.0.1:9090"
-                external_ui = "../files/yacd"
+        if (!forTest && (DataStore.enableClashAPI || useFakeDns || useRemoteRuleSets)) {
+            experimental = ExperimentalOptions().apply {
+                if (DataStore.enableClashAPI) {
+                    clash_api = ClashAPIOptions().apply {
+                        external_controller = "127.0.0.1:9090"
+                        external_ui = "../files/yacd"
+                    }
+                }
+                if (useFakeDns || useRemoteRuleSets) {
+                    cache_file = CacheFile().apply {
+                        enabled = true
+                        path = SagerNet.application.filesDir.resolve("sing-box-cache.db").absolutePath
+                        store_fakeip = useFakeDns
+                    }
+                }
             }
         }
 
@@ -246,6 +293,8 @@ fun buildConfig(
         route = RouteOptions().apply {
             auto_detect_interface = true
             override_android_vpn = true
+            final_ = TAG_PROXY
+            if (useRemoteRuleSets) default_http_client = HTTP_CLIENT_DEFAULT
             rules = mutableListOf()
             rule_set = mutableListOf()
             // sing-box 1.12+ replaced per-server `address_resolver` with dial
@@ -327,6 +376,7 @@ fun buildConfig(
                     if (pastEntity!!.needExternal()) {
                         route.rules.add(Rule_DefaultOptions().apply {
                             inbound = listOf(pastInboundTag)
+                            action = "route"
                             outbound = tagOut
                         })
                     } else {
@@ -464,6 +514,7 @@ fun buildConfig(
                             if (index == profileList.lastIndex) {
                                 route.rules.add(Rule_DefaultOptions().apply {
                                     inbound = listOf(tag)
+                                    action = "route"
                                     outbound = TAG_DIRECT
                                 })
                             }
@@ -517,7 +568,36 @@ fun buildConfig(
         }
         // build outbounds from route item
         extraProxies.forEach { (key, p) ->
-            tagMap[key] = buildChain(key, p)
+            if (key !in tagMap) tagMap[key] = buildChain(key, p)
+        }
+
+        if (useRemoteRuleSets) {
+            val detour = when (ruleSetDownloadMode) {
+                RuleSetDownloadMode.DIRECT -> TAG_DIRECT
+                RuleSetDownloadMode.CURRENT -> TAG_PROXY
+                RuleSetDownloadMode.SPECIFIC -> if (
+                    ruleSetDownloadProxyId == proxy.id && !buildOutboundGroup
+                ) {
+                    TAG_PROXY
+                } else {
+                    tagMap[ruleSetDownloadProxyId] ?: throw IllegalArgumentException(
+                        SagerNet.application.getString(R.string.rules_remote_download_profile_unavailable),
+                    )
+                }
+                else -> throw IllegalArgumentException(
+                    SagerNet.application.getString(
+                        R.string.rules_remote_download_mode_invalid,
+                        ruleSetDownloadMode,
+                    ),
+                )
+            }
+            http_clients = listOf(
+                HTTPClient().apply { tag = HTTP_CLIENT_DEFAULT },
+                HTTPClient().apply {
+                    tag = HTTP_CLIENT_RULE_SET
+                    if (detour != TAG_DIRECT) this.detour = detour
+                },
+            )
         }
 
         // apply user rules
@@ -628,6 +708,7 @@ fun buildConfig(
                     -2L -> TAG_BLOCK
                     else -> if (outId == proxy.id) TAG_PROXY else tagMap[outId] ?: ""
                 }
+                action = "route"
 
                 _hack_custom_config = rule.config
             }
@@ -813,37 +894,45 @@ fun buildConfig(
         if (forTest) {
             dns.rules = listOf()
         } else {
-            // built-in DNS rules
-            route.rules.add(0, Rule_DefaultOptions().apply {
-                protocol = listOf("dns")
-                action = "hijack-dns"
-            })
-            route.rules.add(0, Rule_DefaultOptions().apply {
-                port = listOf(53)
-                action = "hijack-dns"
-            })
-
-            // sing-box 1.13 removed inbound sniff/domain_strategy fields; they
-            // are migrated to route sniff/resolve actions here. Inserted last
-            // with add(0, ...) so sniff runs before everything else.
+            // sing-box 1.13 removed inbound sniff/domain_strategy fields. Keep
+            // these continuing actions before user rules in a fixed order.
             val listenInbounds = mutableListOf<String>()
             if (isVPN) listenInbounds.add("tun-in")
             listenInbounds.add(TAG_MIXED)
-            if (DataStore.resolveDestination) {
-                route.rules.add(0, Rule_DefaultOptions().apply {
-                    inbound = listenInbounds.toList()
-                    action = "resolve"
-                    strategy = genDomainStrategy(true)
-                })
-            }
-            if (needSniff) {
-                route.rules.add(0, Rule_DefaultOptions().apply {
+            val builtInRules = mutableListOf<Rule>()
+            if (trafficSniffingMode > 0) {
+                builtInRules.add(Rule_DefaultOptions().apply {
                     inbound = listenInbounds.toList()
                     action = "sniff"
                 })
             }
+            if (trafficSniffingMode == 2) {
+                builtInRules.add(Rule_DefaultOptions().apply {
+                    inbound = listenInbounds.toList()
+                    action = "sniff-override-destination"
+                })
+            }
+            if (resolveDestinationMode > 0) {
+                builtInRules.add(Rule_DefaultOptions().apply {
+                    inbound = listenInbounds.toList()
+                    action = "resolve"
+                    strategy = genDomainStrategy(true)
+                    match_only = resolveDestinationMode == 1
+                })
+            }
+            builtInRules.add(Rule_DefaultOptions().apply {
+                port = listOf(53)
+                action = "hijack-dns"
+            })
+            builtInRules.add(Rule_DefaultOptions().apply {
+                protocol = listOf("dns")
+                action = "hijack-dns"
+            })
+            route.rules.addAll(0, builtInRules)
+
             if (DataStore.bypassLanInCore) {
                 route.rules.add(Rule_DefaultOptions().apply {
+                    action = "route"
                     outbound = TAG_BYPASS
                     ip_is_private = true
                 })

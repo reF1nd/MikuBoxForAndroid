@@ -81,7 +81,7 @@
     <string name="direct_dns">Direct DNS</string>
     <string name="enable_dns_routing">DNSルーティングを有効化</string>
     <string name="dns_routing_message">バイパスルートのドメインをDirect DNSで解決します。DNSリークの可能性がありますのでご注意ください。</string>
-    <string name="enable_fakedns">FakeDNSを有効化</string>
+    <string name="enable_fakedns">FakeIPを有効化</string>
     <string name="fakedns_message">プロキシ停止後、他のアプリがネットワークに再接続するために再起動が必要になる場合があります。</string>
     <string name="dns_hosts">ドメイン書き換え (Hosts)</string>
     <string name="port_local_dns">ローカルDNSポート</string>
@@ -401,7 +401,7 @@
     <string name="destination_override">宛先の上書き</string>
     <string name="destination_override_summary">スニッフィングされたドメインを使用して、ルーティングだけでなく宛先アドレスも上書きします</string>
     <string name="resolve_destination">宛先の解決</string>
-    <string name="resolve_destination_summary">宛先アドレスがドメインの場合、IPv6戦略に基づいて解決されます（FakeDNSと競合します）</string>
+    <string name="resolve_destination_summary">宛先アドレスがドメインの場合、IPv6戦略に基づいて解決されます</string>
     <string name="pcap">Pcap</string>
     <string name="pcap_notice">Pcapファイルは %s に保存されます</string>
     <string name="naive_insecure_concurrency">安全でない並行性</string>

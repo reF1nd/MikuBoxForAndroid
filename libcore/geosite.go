@@ -1,7 +1,9 @@
 package libcore
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 
 	geosites "github.com/sagernet/sing-box/common/geosite"
 	C "github.com/sagernet/sing-box/constant"
@@ -13,7 +15,11 @@ type geositeReader struct {
 }
 
 func openGeoSite(path string) (*geositeReader, error) {
-	reader, _, err := geosites.Open(path)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	reader, _, err := geosites.NewReader(bytes.NewReader(content))
 	if err != nil {
 		return nil, err
 	}

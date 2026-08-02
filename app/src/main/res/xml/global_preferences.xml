@@ -186,19 +186,21 @@
             android:layout="@layout/uwu_mid"
             app:defaultValue="1"
             app:entries="@array/traffic_sniffing_values"
-            app:entryValues="@array/int_array_2"
+            app:entryValues="@array/int_array_3"
             app:icon="@drawable/ic_baseline_manage_search_24"
             app:key="trafficSniffing"
             app:title="@string/traffic_sniffing"
             app:useSimpleSummaryProvider="true" />
         
-        <SwitchPreference
-            android:layout="@layout/uwu_mid_switch"
-            android:widgetLayout="@layout/uwu_switch"
+        <com.takisoft.preferencex.SimpleMenuPreference
+            android:layout="@layout/uwu_mid"
+            app:defaultValue="0"
+            app:entries="@array/resolve_destination_values"
+            app:entryValues="@array/int_array_3"
             app:icon="@drawable/baseline_wrap_text_24"
             app:key="resolveDestination"
-            app:summary="@string/resolve_destination_summary"
-            app:title="@string/resolve_destination" />
+            app:title="@string/resolve_destination"
+            app:useSimpleSummaryProvider="true" />
         
         <com.takisoft.preferencex.SimpleMenuPreference
             android:layout="@layout/uwu_mid"
@@ -210,6 +212,16 @@
             app:title="@string/ipv6"
             app:useSimpleSummaryProvider="true" />
         
+        <com.takisoft.preferencex.SimpleMenuPreference
+            android:layout="@layout/uwu_mid"
+            app:defaultValue="0"
+            app:entries="@array/rules_resource_modes"
+            app:entryValues="@array/int_array_2"
+            app:icon="@drawable/ic_baseline_rule_folder_24"
+            app:key="rulesResourceMode"
+            app:title="@string/rules_resource_mode"
+            app:useSimpleSummaryProvider="true" />
+
         <com.takisoft.preferencex.SimpleMenuPreference
             android:layout="@layout/uwu_bot"
             app:defaultValue="0"
@@ -235,6 +247,31 @@
             app:key="rules_geoip_url"
             app:title="@string/rules_geoip_url"
             app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:layout="@layout/uwu_top"
+            app:defaultValue="https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{code}.srs"
+            app:icon="@drawable/ic_cloud_download"
+            app:key="rulesGeositeRemoteUrl"
+            app:title="@string/rules_geosite_remote_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:layout="@layout/uwu_mid"
+            app:defaultValue="https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{code}.srs"
+            app:icon="@drawable/ic_cloud_download"
+            app:key="rulesGeoipRemoteUrl"
+            app:title="@string/rules_geoip_remote_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            android:layout="@layout/uwu_bot"
+            app:defaultValue="direct"
+            app:entries="@array/rules_remote_download_modes"
+            app:entryValues="@array/rules_remote_download_mode_values"
+            app:icon="@drawable/ic_hardware_router"
+            app:key="rulesRemoteDownloadMode"
+            app:title="@string/rules_remote_download_mode" />
         
     </PreferenceCategory>
     
