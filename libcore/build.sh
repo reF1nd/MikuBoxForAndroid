@@ -1,22 +1,28 @@
 #!/bin/bash
 
+export GOWORK=off
+
 [ -f ./env_java.sh ] && source ./env_java.sh
 source ../buildScript/init/env_ndk.sh
 
 BUILD=".build"
+export PATH="$PWD/$BUILD/bin:$PATH"
+
+if [ ! -x "$BUILD/bin/gobind" ]; then
+  echo "Error: pinned gobind is missing; run ./init.sh first."
+  exit 1
+fi
 
 # gomobile does not run sing-box's build_libbox helper, which normally sets
 # constant.Version. Preserve the checked-out core revision in the About page.
-SING_BOX_VERSION=$(git -C ../sing-box describe --tags --always --dirty 2>/dev/null || echo unknown)
+SING_BOX_VERSION=$(git -C ../sing-box describe --tags --exact-match 2>/dev/null || \
+  git -C ../sing-box describe --tags --always --dirty 2>/dev/null || echo unknown)
+SING_BOX_VERSION=${SING_BOX_VERSION#v}
 
 rm -rf $BUILD/android \
   $BUILD/java \
   $BUILD/javac-output \
   $BUILD/src
-
-if [ -z "$GOPATH" ]; then
-  GOPATH=$(go env GOPATH)
-fi
 
 # libbox is bound alongside libcore: NativeInterface/LocalResolverImpl implement
 # libbox.PlatformInterface and libbox.LocalDNSTransport, and libcore exports
@@ -26,10 +32,10 @@ fi
 # -checklinkname=0 and the badlinkname/tfogo_checklinkname0 tags are required to
 # link sing-box 1.14 (tfo-go and tailscale rely on //go:linkname).
 #
-# NOTE: sagernet/gomobile v0.1.13 (installed by init.sh) has no `-cache` flag;
+# NOTE: go.mod pins sagernet/gomobile v0.1.13, which has no `-cache` flag;
 # passing it aborts with "flag provided but not defined: -cache". gomobile
 # falls back to the default GOCACHE, so caching still works.
-"$GOPATH"/bin/gomobile bind -v -androidapi 21 -trimpath \
+go tool gomobile bind -v -androidapi 21 -trimpath \
   -ldflags="-s -w -checklinkname=0 -X github.com/sagernet/sing-box/constant.Version=${SING_BOX_VERSION}" \
   -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0' \
   -o libcore.aar \

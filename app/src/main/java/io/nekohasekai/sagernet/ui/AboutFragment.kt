@@ -120,7 +120,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(SagerNet.appVersionNameForDisplay)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/HatsuneMikuUwU/MikuBoxForAndroid/releases"
+                                        "https://github.com/reF1nd/MikuBoxForAndroid/releases"
                                     )
                                 }
                                 .build())
@@ -209,7 +209,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(R.string.github)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/HatsuneMikuUwU/MikuBoxForAndroid"
+                                        "https://github.com/reF1nd/MikuBoxForAndroid"
                                     )
                                 }
                                 .build())
@@ -220,7 +220,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(R.string.telegram)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://t.me/uwuowoumuChannel"
+                                        "https://t.me/sing_box_reF1nd"
                                     )
                                 }
                                 .build())
@@ -230,6 +230,17 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                     MaterialAboutCard.Builder()
                         .outline(false)
                         .title(R.string.uwu_big_thanks)
+                        .addItem(
+                            MaterialAboutActionItem.Builder()
+                                .icon(R.drawable.ic_github)
+                                .text(R.string.uwu_mikubox_upstream)
+                                .subText(R.string.github)
+                                .setOnClickAction {
+                                    requireContext().launchCustomTab(
+                                        "https://github.com/HatsuneMikuUwU/MikuBoxForAndroid"
+                                    )
+                                }
+                                .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .icon(R.drawable.ic_github)

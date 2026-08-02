@@ -1,11 +1,9 @@
 #!/bin/bash
 
+export GOWORK=off
+
 chmod -R 777 .build 2>/dev/null
 rm -rf .build 2>/dev/null
-
-if [ -z "$GOPATH" ]; then
-    GOPATH=$(go env GOPATH)
-fi
 
 # The sing-box submodule is bumped frequently and each bump pulls newer
 # transitive deps than libcore/go.mod pins. Go's default -mod=readonly then
@@ -14,12 +12,8 @@ fi
 # Resync go.mod/go.sum against the checked-out submodule before building.
 go mod tidy || exit 1
 
-# sing-box's own gomobile fork. Upstream golang.org/x/mobile lacks the -libname
-# flag and the binding fixes libbox depends on; sing-box pins this version in
-# its Makefile (lib_install).
-if [ ! -f "$GOPATH/bin/gomobile" ]; then
-    go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.13
-    go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.13
-fi
-
-"$GOPATH"/bin/gomobile init
+# gomobile init installs gobind@latest internally, bypassing go.mod. Android
+# bind does not need its optional OpenAL setup, so build the pinned gobind tool
+# directly and keep it local to this checkout.
+mkdir -p .build/bin
+go build -o .build/bin/gobind github.com/sagernet/gomobile/cmd/gobind

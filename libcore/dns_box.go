@@ -24,7 +24,7 @@ type Func = libbox.Func
 
 // rawQueryFunc performs a raw DNS exchange through android_res_nsend.
 // Set by dns_android.go's init on Android 10+; nil elsewhere.
-var rawQueryFunc func(networkHandle int64, request []byte) ([]byte, error)
+var rawQueryFunc func(ctx context.Context, networkHandle int64, request []byte) ([]byte, error)
 
 var networkHandle atomic.Int64
 
@@ -69,7 +69,7 @@ func (t *androidLocalTransport) Exchange(ctx context.Context, message *mDNS.Msg)
 	if err != nil {
 		return nil, err
 	}
-	responseBytes, err := rawQueryFunc(networkHandle.Load(), request)
+	responseBytes, err := rawQueryFunc(ctx, networkHandle.Load(), request)
 	if err != nil {
 		return nil, err
 	}
@@ -78,4 +78,10 @@ func (t *androidLocalTransport) Exchange(ctx context.Context, message *mDNS.Msg)
 		return nil, err
 	}
 	return &response, nil
+}
+
+func (t *androidLocalTransport) ExchangeAsync(ctx context.Context, message *mDNS.Msg, callback func(response *mDNS.Msg, err error)) {
+	go func() {
+		callback(t.Exchange(ctx, message))
+	}()
 }

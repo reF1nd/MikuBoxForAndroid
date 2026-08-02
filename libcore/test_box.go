@@ -43,6 +43,7 @@ func testBoxContext() context.Context {
 	return box.Context(
 		context.Background(),
 		include.InboundRegistry(),
+		include.ProviderRegistry(),
 		include.OutboundRegistry(),
 		include.EndpointRegistry(),
 		dnsRegistry,
