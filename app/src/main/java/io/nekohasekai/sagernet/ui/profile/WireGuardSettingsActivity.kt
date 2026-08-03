@@ -1,11 +1,14 @@
 package io.nekohasekai.sagernet.ui.profile
 
 import android.os.Bundle
+import android.text.InputType
 import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
+import io.nekohasekai.sagernet.fmt.wireguard.formatWireGuardPeers
+import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardPeers
 import moe.matsuri.nb4a.proxy.PreferenceBinding
 import moe.matsuri.nb4a.proxy.PreferenceBindingManager
 import moe.matsuri.nb4a.proxy.Type
@@ -15,6 +18,10 @@ import androidx.preference.PreferenceScreen
 import io.nekohasekai.sagernet.database.DataStore
 
 class WireGuardSettingsActivity : ProfileSettingsActivity<WireGuardBean>() {
+
+    companion object {
+        private const val ADDITIONAL_PEERS = "wireGuardAdditionalPeers"
+    }
 
     override fun createEntity() = WireGuardBean()
 
@@ -26,15 +33,29 @@ class WireGuardSettingsActivity : ProfileSettingsActivity<WireGuardBean>() {
     private val privateKey = pbm.add(PreferenceBinding(Type.Text, "privateKey"))
     private val peerPublicKey = pbm.add(PreferenceBinding(Type.Text, "peerPublicKey"))
     private val peerPreSharedKey = pbm.add(PreferenceBinding(Type.Text, "peerPreSharedKey"))
+    private val peerAllowedIPs = pbm.add(PreferenceBinding(Type.Text, "peerAllowedIPs"))
+    private val peerPersistentKeepaliveInterval =
+        pbm.add(PreferenceBinding(Type.TextToInt, "peerPersistentKeepaliveInterval"))
     private val mtu = pbm.add(PreferenceBinding(Type.TextToInt, "mtu"))
     private val reserved = pbm.add(PreferenceBinding(Type.Text, "reserved"))
+    private val listenPort = pbm.add(PreferenceBinding(Type.TextToInt, "listenPort"))
+    private val dnsServer = pbm.add(PreferenceBinding(Type.Text, "dnsServer"))
 
     override fun WireGuardBean.init() {
         pbm.writeToCacheAll(this)
+        DataStore.profileCacheStore.putString(
+            ADDITIONAL_PEERS,
+            formatWireGuardPeers(peers.drop(1)),
+        )
     }
 
     override fun WireGuardBean.serialize() {
         pbm.fromCacheAll(this)
+        val additionalPeers = DataStore.profileCacheStore.getString(ADDITIONAL_PEERS).orEmpty()
+        peers = buildList {
+            add(primaryPeer())
+            if (additionalPeers.isNotBlank()) addAll(parseWireGuardPeers(additionalPeers))
+        }
     }
 
     override fun PreferenceFragmentCompat.createPreferences(
@@ -54,6 +75,16 @@ class WireGuardSettingsActivity : ProfileSettingsActivity<WireGuardBean>() {
             .setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
         (privateKey.preference as EditTextPreference).summaryProvider = PasswordSummaryProvider
         (mtu.preference as EditTextPreference).setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
+        (listenPort.preference as EditTextPreference)
+            .setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
+        (peerPersistentKeepaliveInterval.preference as EditTextPreference)
+            .setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
+        findPreference<EditTextPreference>(ADDITIONAL_PEERS)!!.setOnBindEditTextListener { editText ->
+            editText.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            editText.minLines = 8
+            editText.typeface = android.graphics.Typeface.MONOSPACE
+            editText.setSelection(editText.text.length)
+        }
     }
 
     private fun updateAllCategoryStyles(styleValue: String?, group: PreferenceGroup) {

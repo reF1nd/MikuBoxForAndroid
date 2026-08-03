@@ -36,8 +36,11 @@
             app:key="privateKey"
             app:title="@string/ssh_private_key"
             app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+    <PreferenceCategory
+        app:title="@string/wireguard_peer">
         <EditTextPreference
-            android:layout="@layout/uwu_mid"
+            android:layout="@layout/uwu_top"
             app:icon="@drawable/ic_action_copyright"
             app:key="peerPublicKey"
             app:title="@string/wireguard_public_key"
@@ -50,16 +53,51 @@
             app:title="@string/wireguard_psk" />
         <EditTextPreference
             android:layout="@layout/uwu_mid"
+            app:icon="@drawable/baseline_public_24"
+            app:key="peerAllowedIPs"
+            app:title="@string/wireguard_allowed_ips"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:layout="@layout/uwu_mid"
+            app:defaultValue="0"
+            app:icon="@drawable/ic_baseline_timelapse_24"
+            app:key="peerPersistentKeepaliveInterval"
+            app:title="@string/wireguard_persistent_keepalive"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:layout="@layout/uwu_mid"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="reserved"
+            app:title="@string/wireguard_reserved"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:layout="@layout/uwu_bot"
+            app:icon="@drawable/ic_av_playlist_add"
+            app:key="wireGuardAdditionalPeers"
+            app:title="@string/wireguard_additional_peers"
+            app:summary="@string/wireguard_additional_peers_summary" />
+    </PreferenceCategory>
+    <PreferenceCategory
+        app:title="@string/wireguard_endpoint_options">
+        <EditTextPreference
+            android:layout="@layout/uwu_top"
             app:defaultValue="1420"
             app:icon="@drawable/baseline_public_24"
             app:key="mtu"
             app:title="@string/mtu"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
-            android:layout="@layout/uwu_bot"
-            app:icon="@drawable/ic_baseline_fingerprint_24"
-            app:key="reserved"
-            app:title="Reserved"
+            android:layout="@layout/uwu_mid"
+            app:defaultValue="0"
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="listenPort"
+            app:title="@string/wireguard_listen_port"
             app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:layout="@layout/uwu_bot"
+            app:icon="@drawable/ic_action_dns"
+            app:key="dnsServer"
+            app:title="@string/wireguard_dns_server"
+            app:summary="@string/wireguard_dns_server_summary" />
     </PreferenceCategory>
 </PreferenceScreen>

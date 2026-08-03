@@ -3991,6 +3991,8 @@ public class SingBoxOptions {
 
         public Integer workers;
 
+        public String inner_domain_resolver;
+
     }
 
     public static class Outbound_HysteriaOptions extends Outbound {

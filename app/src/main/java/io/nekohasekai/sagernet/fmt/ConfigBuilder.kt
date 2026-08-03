@@ -27,7 +27,9 @@ import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.buildSingBoxEndpointWireGuardBean
 import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.mkPort
+import io.nekohasekai.sagernet.ktx.parseNumericAddress
 import io.nekohasekai.sagernet.utils.PackageCache
+import io.nekohasekai.sagernet.utils.Subnet
 import moe.matsuri.nb4a.*
 import moe.matsuri.nb4a.SingBoxOptions.*
 import moe.matsuri.nb4a.plugin.Plugins
@@ -40,6 +42,7 @@ import moe.matsuri.nb4a.utils.JavaUtil.gson
 import moe.matsuri.nb4a.utils.Util
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.net.URI
 
 const val TAG_MIXED = "mixed-in"
 
@@ -315,6 +318,91 @@ fun buildConfig(
             }
         }
 
+        fun DNSServerOptions.setTransport(address: String) {
+            val scheme = if (address.contains("://")) {
+                address.substringBefore("://").lowercase()
+            } else {
+                ""
+            }
+            val rest = if (scheme.isNotEmpty()) address.substringAfter("://") else address
+
+            fun setHost(defaultPort: Int) {
+                if (rest.startsWith("[")) {
+                    val closingBracket = rest.indexOf(']')
+                    require(closingBracket > 1) { "Invalid DNS server address: $address" }
+                    server = rest.substring(1, closingBracket)
+                    val port = rest.substring(closingBracket + 1)
+                    server_port = when {
+                        port.isEmpty() -> defaultPort
+                        port.startsWith(":") -> port.substring(1).toIntOrNull()
+                            ?: error("Invalid DNS server port: $address")
+                        else -> error("Invalid DNS server address: $address")
+                    }
+                } else if (rest.count { it == ':' } > 1) {
+                    server = rest
+                    server_port = defaultPort
+                } else {
+                    server = rest.substringBeforeLast(':', rest)
+                    server_port = rest.substringAfterLast(':', defaultPort.toString()).toIntOrNull()
+                        ?: error("Invalid DNS server port: $address")
+                }
+            }
+
+            // Legacy keyword transports that carried no "scheme://" prefix.
+            when (address) {
+                "local" -> {
+                    type = "local"
+                    return
+                }
+
+                "fakeip" -> {
+                    type = "fakeip"
+                    return
+                }
+            }
+
+            when (scheme) {
+                "dhcp" -> {
+                    // "dhcp://auto" auto-detects the interface. A named
+                    // interface would need an `interface` field, which the
+                    // simple direct/remote DNS input does not expose.
+                    type = "dhcp"
+                }
+
+                "tcp" -> {
+                    type = "tcp"
+                    setHost(53)
+                }
+
+                "tls" -> {
+                    type = "tls"
+                    setHost(853)
+                }
+
+                "quic" -> {
+                    type = "quic"
+                    setHost(853)
+                }
+
+                "https", "http", "h3" -> {
+                    val url = "https://$rest".toHttpUrlOrNull()
+                    type = if (scheme == "h3") "h3" else "https"
+                    if (url != null) {
+                        server = url.host
+                        server_port = url.port
+                        path = url.encodedPath.takeIf { it.isNotEmpty() && it != "/" }
+                    } else {
+                        setHost(443)
+                    }
+                }
+
+                else -> {
+                    type = "udp"
+                    setHost(53)
+                }
+            }
+        }
+
         // returns outbound tag
         fun buildChain(
             chainId: Long, entity: ProxyEntity
@@ -380,6 +468,11 @@ fun buildConfig(
                             outbound = tagOut
                         })
                     } else {
+                        if (pastOutbound is Endpoint_WireGuardOptions &&
+                            pastOutbound.listen_port?.let { it > 0 } == true
+                        ) {
+                            error(SagerNet.application.getString(R.string.wireguard_listen_port_detour_conflict))
+                        }
                         pastOutbound._hack_config_map["detour"] = tagOut
                     }
                 } else {
@@ -474,6 +567,66 @@ fun buildConfig(
                     _hack_config_map["tag"] = tagOut
 
                     _hack_custom_config = bean.customOutboundJson
+                }
+
+                if (bean is WireGuardBean && bean.dnsServer.isNotBlank()) {
+                    val dnsAddress = bean.dnsServer.trim()
+                    val scheme = dnsAddress.substringBefore("://", "").lowercase()
+                    require('\n' !in dnsAddress && '\r' !in dnsAddress && ',' !in dnsAddress) {
+                        SagerNet.application.getString(R.string.wireguard_dns_server_invalid)
+                    }
+                    if (scheme.isEmpty()) {
+                        require(dnsAddress.parseNumericAddress() != null) {
+                            SagerNet.application.getString(R.string.wireguard_dns_server_invalid)
+                        }
+                    } else {
+                        require(scheme in setOf("udp", "tcp", "tls", "quic", "https", "h3")) {
+                            SagerNet.application.getString(R.string.wireguard_dns_server_invalid)
+                        }
+                        val uri = runCatching { URI(dnsAddress) }.getOrNull()
+                        require(
+                            uri?.host?.isNotBlank() == true &&
+                                uri.userInfo == null &&
+                                uri.fragment == null &&
+                                uri.query == null &&
+                                (uri.port == -1 || uri.port in 1..65535) &&
+                                (scheme in setOf("https", "h3") || uri.path.isNullOrEmpty() || uri.path == "/")
+                        ) {
+                            SagerNet.application.getString(R.string.wireguard_dns_server_invalid)
+                        }
+                    }
+                    if (bean.customOutboundJson.isNotBlank()) {
+                        val customOptions = gson.fromJson(bean.customOutboundJson, Map::class.java).orEmpty()
+                        require(!customOptions.containsKey("inner_domain_resolver")) {
+                            SagerNet.application.getString(R.string.wireguard_dns_server_custom_conflict)
+                        }
+                    }
+
+                    val dnsServer = DNSServerOptions().apply {
+                        setTransport(dnsAddress)
+                    }
+                    require(!dnsServer.server.isNullOrBlank()) {
+                        SagerNet.application.getString(R.string.wireguard_dns_server_invalid)
+                    }
+                    dnsServer.server?.parseNumericAddress()?.let { address ->
+                        val covered = bean.peers.asSequence()
+                            .flatMap { it.allowedIPs.listByLineOrComma().asSequence() }
+                            .map(String::trim)
+                            .filter(String::isNotEmpty)
+                            .mapNotNull(Subnet::fromString)
+                            .any { it.toImmutable().matches(address.address) }
+                        require(covered) {
+                            SagerNet.application.getString(R.string.wireguard_dns_server_not_routed)
+                        }
+                    }
+
+                    val dnsTag = "dns-wg-${proxyEntity.id}"
+                    dns.servers.add(dnsServer.apply {
+                        tag = dnsTag
+                        detour = tagOut
+                        if (!server.isIpAddress()) domain_resolver = "dns-direct"
+                    })
+                    (currentOutbound as Endpoint_WireGuardOptions).inner_domain_resolver = dnsTag
                 }
 
                 // External proxy need a dokodemo-door inbound to forward the traffic
@@ -788,70 +941,6 @@ fun buildConfig(
             "https://$address".toHttpUrlOrNull()?.apply {
                 if (!host.isIpAddress()) {
                     domainListDNSDirectForce.add("full:$host")
-                }
-            }
-        }
-
-        fun DNSServerOptions.setTransport(address: String) {
-            val scheme = if (address.contains("://")) address.substringBefore("://") else ""
-            val rest = if (scheme.isNotEmpty()) address.substringAfter("://") else address
-
-            fun setHost(defaultPort: Int) {
-                server = rest.substringBeforeLast(':', rest)
-                server_port = rest.substringAfterLast(':', defaultPort.toString()).toIntOrNull() ?: defaultPort
-            }
-
-            // Legacy keyword transports that carried no "scheme://" prefix.
-            when (address) {
-                "local" -> {
-                    type = "local"
-                    return
-                }
-
-                "fakeip" -> {
-                    type = "fakeip"
-                    return
-                }
-            }
-
-            when (scheme) {
-                "dhcp" -> {
-                    // "dhcp://auto" auto-detects the interface. A named
-                    // interface would need an `interface` field, which the
-                    // simple direct/remote DNS input does not expose.
-                    type = "dhcp"
-                }
-
-                "tcp" -> {
-                    type = "tcp"
-                    setHost(53)
-                }
-
-                "tls" -> {
-                    type = "tls"
-                    setHost(853)
-                }
-
-                "quic" -> {
-                    type = "quic"
-                    setHost(853)
-                }
-
-                "https", "http", "h3" -> {
-                    val url = "https://$rest".toHttpUrlOrNull()
-                    type = if (scheme == "h3") "h3" else "https"
-                    if (url != null) {
-                        server = url.host
-                        server_port = url.port
-                        path = url.encodedPath.takeIf { it.isNotEmpty() && it != "/" }
-                    } else {
-                        setHost(443)
-                    }
-                }
-
-                else -> {
-                    type = "udp"
-                    setHost(53)
                 }
             }
         }

@@ -31,6 +31,7 @@ import io.nekohasekai.sagernet.fmt.juicity.JuicityBean
 import io.nekohasekai.sagernet.fmt.juicity.toUri
 import io.nekohasekai.sagernet.fmt.v2ray.*
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
+import io.nekohasekai.sagernet.fmt.wireguard.toWgQuickConfig
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ui.profile.*
 import moe.matsuri.nb4a.SingBoxOptions.MultiplexOptions
@@ -271,6 +272,9 @@ data class ProxyEntity(
     }
 
     fun exportConfig(): Pair<String, String> {
+        (requireBean() as? WireGuardBean)?.let {
+            return it.toWgQuickConfig() to "${it.displayName()}.conf"
+        }
         var name = "${requireBean().displayName()}.json"
 
         return with(requireBean()) {
