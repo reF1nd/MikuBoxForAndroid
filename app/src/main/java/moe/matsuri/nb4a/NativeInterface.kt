@@ -5,6 +5,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.system.OsConstants
 import androidx.annotation.RequiresApi
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.ServiceNotification
@@ -17,7 +18,9 @@ import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import libbox.*
 import moe.matsuri.nb4a.net.LocalResolverImpl
+import java.net.Inet6Address
 import java.net.InetSocketAddress
+import java.net.InterfaceAddress
 import java.net.NetworkInterface as JavaNetworkInterface
 
 class NativeInterface(
@@ -116,16 +119,33 @@ class NativeInterface(
     }
 
     override fun getInterfaces(): NetworkInterfaceIterator? {
-        val interfaces = JavaNetworkInterface.getNetworkInterfaces()?.toList().orEmpty().map { networkInterface ->
+        val networkInterfaces = JavaNetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+        val interfaces = SagerNet.connectivity.allNetworks.mapNotNull { network ->
+            val linkProperties = SagerNet.connectivity.getLinkProperties(network) ?: return@mapNotNull null
+            val capabilities = SagerNet.connectivity.getNetworkCapabilities(network) ?: return@mapNotNull null
+            val interfaceName = linkProperties.interfaceName ?: return@mapNotNull null
+            val networkInterface = networkInterfaces.find { it.name == interfaceName } ?: return@mapNotNull null
             NetworkInterface().apply {
                 index = networkInterface.index
                 mtu = runCatching { networkInterface.mtu }.getOrDefault(0)
-                name = networkInterface.name
-                addresses = stringIterator(networkInterface.inetAddresses.toList().map { it.hostAddress ?: "" })
-                flags = 0
-                type = 0
-                dnsServer = stringIterator(emptyList())
-                metered = false
+                name = interfaceName
+                addresses = stringIterator(networkInterface.interfaceAddresses.map { it.toPrefix() })
+                flags = if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    OsConstants.IFF_UP or OsConstants.IFF_RUNNING
+                } else {
+                    0
+                }
+                if (networkInterface.isLoopback) flags = flags or OsConstants.IFF_LOOPBACK
+                if (networkInterface.isPointToPoint) flags = flags or OsConstants.IFF_POINTOPOINT
+                if (networkInterface.supportsMulticast()) flags = flags or OsConstants.IFF_MULTICAST
+                type = when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> Libbox.InterfaceTypeWIFI
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> Libbox.InterfaceTypeCellular
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> Libbox.InterfaceTypeEthernet
+                    else -> Libbox.InterfaceTypeOther
+                }
+                dnsServer = stringIterator(linkProperties.dnsServers.mapNotNull { it.hostAddress })
+                metered = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
             }
         }
         return object : NetworkInterfaceIterator {
@@ -140,6 +160,12 @@ class NativeInterface(
         override fun len(): Int = values.size
         override fun hasNext(): Boolean = index < values.size
         override fun next(): String? = values.getOrNull(index++)
+    }
+
+    private fun InterfaceAddress.toPrefix(): String = if (address is Inet6Address) {
+        "${Inet6Address.getByAddress(address.address).hostAddress}/$networkPrefixLength"
+    } else {
+        "${address.hostAddress}/$networkPrefixLength"
     }
 
     override fun underNetworkExtension(): Boolean = false
