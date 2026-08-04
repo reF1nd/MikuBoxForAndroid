@@ -3,15 +3,15 @@ package moe.matsuri.nb4a;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
 import com.google.gson.ToNumberPolicy;
 import com.google.gson.TypeAdapter;
 import com.google.gson.TypeAdapterFactory;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 
-import java.lang.reflect.Type;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +33,7 @@ public class SingBoxOptions {
             .create();
 
     private static final Gson gsonSingbox = new GsonBuilder()
-            .registerTypeHierarchyAdapter(SingBoxOption.class, new SingBoxOptionSerializer())
+            .registerTypeAdapterFactory(new SingBoxOptionAdapterFactory())
             .setPrettyPrinting()
             .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
             .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
@@ -76,32 +76,39 @@ public class SingBoxOptions {
     }
 
     // 自定义序列化器
-    public static class SingBoxOptionSerializer implements JsonSerializer<SingBoxOption> {
+    public static class SingBoxOptionAdapterFactory implements TypeAdapterFactory {
         @Override
-        public JsonElement serialize(SingBoxOption src, Type typeOfSrc, JsonSerializationContext context) {
-            // 拿到原始的 delegate（默认序列化器）
-            TypeAdapter<?> delegate = gsonSingbox.getDelegateAdapter(
-                    new TypeAdapterFactory() {
-                        @Override
-                        public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
-                            return null; // 返回 null，表示只作为“跳过当前自定义”的 marker
-                        }
-                    },
-                    TypeToken.get(src.getClass())
-            );
-            Map<String, Object> map;
-            if (src instanceof CustomSingBoxOption) {
-                map = ((CustomSingBoxOption) src).getBasicMap();
-            } else {
-                map = gsonDefault.fromJson(gsonDefault.toJson(src), Map.class);
-            }
-            if (src._hack_config_map != null && !src._hack_config_map.isEmpty()) {
-                Util.INSTANCE.mergeMap(map, src._hack_config_map);
-            }
-            if (src._hack_custom_config != null && !src._hack_custom_config.isBlank()) {
-                Util.INSTANCE.mergeJSON(map, src._hack_custom_config);
-            }
-            return gsonSingbox.toJsonTree(map);
+        public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+            if (!SingBoxOption.class.isAssignableFrom(type.getRawType())) return null;
+            TypeAdapter<T> delegate = gson.getDelegateAdapter(this, type);
+            return new TypeAdapter<T>() {
+                @Override
+                public void write(JsonWriter out, T value) throws IOException {
+                    if (value == null) {
+                        out.nullValue();
+                        return;
+                    }
+                    SingBoxOption src = (SingBoxOption) value;
+                    Map<String, Object> map;
+                    if (src instanceof CustomSingBoxOption) {
+                        map = ((CustomSingBoxOption) src).getBasicMap();
+                    } else {
+                        map = gsonDefault.fromJson(delegate.toJsonTree(value), Map.class);
+                    }
+                    if (src._hack_config_map != null && !src._hack_config_map.isEmpty()) {
+                        Util.INSTANCE.mergeMap(map, src._hack_config_map);
+                    }
+                    if (src._hack_custom_config != null && !src._hack_custom_config.isBlank()) {
+                        Util.INSTANCE.mergeJSON(map, src._hack_custom_config);
+                    }
+                    gson.getAdapter(JsonElement.class).write(out, gsonDefault.toJsonTree(map));
+                }
+
+                @Override
+                public T read(JsonReader in) throws IOException {
+                    return delegate.read(in);
+                }
+            };
         }
     }
 
