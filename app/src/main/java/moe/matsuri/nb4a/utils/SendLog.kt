@@ -5,19 +5,17 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.use
 import io.nekohasekai.sagernet.utils.CrashHandler
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 
 object SendLog {
     // Create full log and send
-    fun sendLog(context: Context, title: String) {
+    fun sendLog(context: Context, title: String, coreLog: String = "") {
         val logFile = File.createTempFile(
             "$title ",
             ".log",
@@ -41,8 +39,11 @@ object SendLog {
             logFile.appendText("Export logcat error: " + CrashHandler.formatThrowable(e))
         }
 
-        logFile.appendText("\n")
-        logFile.appendBytes(getNekoLog(0))
+        if (coreLog.isNotBlank()) {
+            logFile.appendText("\nCore log:\n\n")
+            logFile.appendText(coreLog)
+            logFile.appendText("\n")
+        }
 
         context.startActivity(
             Intent.createChooser(
@@ -57,21 +58,4 @@ object SendLog {
         )
     }
 
-    // Get log bytes from neko.log
-    fun getNekoLog(max: Long): ByteArray {
-        return try {
-            val file = File(
-                SagerNet.application.cacheDir,
-                "neko.log"
-            )
-            val len = file.length()
-            val stream = FileInputStream(file)
-            if (max in 1 until len) {
-                stream.skip(len - max) // TODO string?
-            }
-            stream.use { it.readBytes() }
-        } catch (e: Exception) {
-            e.stackTraceToString().toByteArray()
-        }
-    }
 }

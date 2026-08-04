@@ -61,10 +61,9 @@ func Setup(process, cachePath, internalAssets, externalAssets string,
 		gLocalDNSTransport = newAndroidLocalTransport("local", option.LocalDNSServerOptions{})
 	}
 
-	// golang.org/x/mobile/asset needs the JNI environment of the Java thread
-	// that entered Go. Calling asset.Open from a detached goroutine terminates
-	// the Android :bg process with "asset: no current JVM" before VpnService
-	// can start. Extract while Setup is still executing on Application.onCreate.
+	// The asset package must use the same gomobile runtime as the generated Java
+	// bindings so Seq.setContext initializes its JVM. Keep extraction on this
+	// Java-entered call because detached goroutines have no Android JNI context.
 	if isBgProcess {
 		extractAssets()
 	}

@@ -233,7 +233,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
     private fun clearAppCache() {
         try {
             val cacheDir = SagerNet.application.cacheDir
-            clearDirFiles(cacheDir, skipFiles = setOf("neko.log"))
+            clearDirFiles(cacheDir)
             val parentDir = cacheDir.parentFile
             val relativeCache = File(parentDir, "cache")
             if (relativeCache.exists() && relativeCache.isDirectory) {
@@ -249,22 +249,13 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         }
     }
 
-    private fun clearDirFiles(dir: File, skipFiles: Set<String> = emptySet()): Boolean {
+    private fun clearDirFiles(dir: File): Boolean {
         if (dir.isDirectory) {
             val children = dir.list() ?: return true
             for (child in children) {
                 val childFile = File(dir, child)
-                if (child == "neko.log") {
-                    try {
-                        childFile.writeText("")
-                        continue
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-                if (child in skipFiles) continue
                 if (childFile.isDirectory) {
-                    clearDirFiles(childFile, skipFiles)
+                    clearDirFiles(childFile)
                 } else {
                     childFile.delete()
                 }
