@@ -65,13 +65,13 @@ class NativeInterface(
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int
-    ): ConnectionOwner? {
+    ): ConnectionOwner {
         val uid = SagerNet.connectivity.getConnectionOwnerUid(
             ipProtocol,
             InetSocketAddress(sourceAddress, sourcePort),
             InetSocketAddress(destinationAddress, destinationPort)
         )
-        if (uid < 0) return null
+        if (uid < 0) error("android: connection owner not found")
         val result = ConnectionOwner()
         result.userId = uid
         result.userName = ""
